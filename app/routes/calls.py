@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, BackgroundTasks
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.database import AsyncSessionLocal
@@ -23,11 +24,18 @@ async def ingest_packet(
     # ensure call exists
     result = await db.execute(select(Call).where(Call.id == call_id))
     call = result.scalar_one_or_none()
-
+    
     if call is None:
         call = Call(id=call_id, state=CallState.IN_PROGRESS)
         db.add(call)
-        await db.commit()
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            # another request created it concurrently
+            result = await db.execute(select(Call).where(Call.id == call_id))
+            call = result.scalar_one()
+    
 
     # get last sequence
     last_seq_result = await db.execute(
