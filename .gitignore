@@ -1,15 +1,18 @@
-# Virtual environments
+# virtual environments
 arti/
 venv/
 .env
 .env.*
 
-# Python cache
+# python cache
 __pycache__/
 *.py[cod]
 
-# Logs
+# logs
 *.log
 
 # OS
 .DS_Store
+
+# tests
+tests/
