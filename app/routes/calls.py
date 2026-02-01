@@ -4,7 +4,9 @@ from sqlalchemy import select, func
 from app.database import AsyncSessionLocal
 from app.models import Call, CallState, Packet
 from app.schemas import PacketIn
+from app.services.flaky_ai import flaky_ai_process, FlakyAIUnavailable
 import asyncio
+
 
 router = APIRouter(prefix="/v1/call", tags=["calls"])
 
@@ -60,6 +62,9 @@ async def complete_call(
     if call is None:
         return {"error": "call not found"}
 
+    if call.state!=CallState.IN_PROGRESS:
+        return {"status": "already processing"}
+    
     call.state = CallState.COMPLETED
     await db.commit()
 
@@ -68,6 +73,9 @@ async def complete_call(
     return {"status": "call completed"}
 
 async def process_ai_stub(call_id: str):
+    max_retries = 3
+    delay = 1
+
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Call).where(Call.id == call_id))
         call = result.scalar_one()
@@ -75,5 +83,30 @@ async def process_ai_stub(call_id: str):
         call.state = CallState.PROCESSING_AI
         await db.commit()
 
-    await asyncio.sleep(1)
-    print(f"AI processing started for call {call_id}")
+    for attempt in range(1, max_retries + 1):
+        try:
+            result = await flaky_ai_process(call_id)
+            print(f"AI success for {call_id}: {result}")
+
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(select(Call).where(Call.id == call_id))
+                call = result.scalar_one()
+                call.state = CallState.ARCHIVED
+                await db.commit()
+
+            return
+
+        except FlakyAIUnavailable:
+            print(f"Retry {attempt} failed for {call_id}")
+            if attempt < max_retries:
+                await asyncio.sleep(delay)
+                delay *= 2
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Call).where(Call.id == call_id))
+        call = result.scalar_one()
+        call.state = CallState.FAILED
+        await db.commit()
+
+    print(f"AI permanently failed for {call_id}")
+
