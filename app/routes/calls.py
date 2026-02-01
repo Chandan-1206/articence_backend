@@ -7,7 +7,7 @@ from app.models import Call, CallState, Packet
 from app.schemas import PacketIn
 from app.services.flaky_ai import flaky_ai_process, FlakyAIUnavailable
 import asyncio
-
+from app.routes.ws import active_connections
 
 router = APIRouter(prefix="/v1/call", tags=["calls"])
 
@@ -75,6 +75,10 @@ async def complete_call(
     
     call.state = CallState.COMPLETED
     await db.commit()
+    await notify_supervisors({
+        "call_id": call_id,
+        "state": call.state
+    })
 
     background_tasks.add_task(process_ai_stub, call_id)
 
@@ -90,6 +94,10 @@ async def process_ai_stub(call_id: str):
 
         call.state = CallState.PROCESSING_AI
         await db.commit()
+        await notify_supervisors({
+            "call_id": call_id,
+            "state": call.state
+        })
 
     for attempt in range(1, max_retries + 1):
         try:
@@ -101,6 +109,10 @@ async def process_ai_stub(call_id: str):
                 call = result.scalar_one()
                 call.state = CallState.ARCHIVED
                 await db.commit()
+                await notify_supervisors({
+                    "call_id": call_id,
+                    "state": call.state
+                })
 
             return
 
@@ -115,6 +127,13 @@ async def process_ai_stub(call_id: str):
         call = result.scalar_one()
         call.state = CallState.FAILED
         await db.commit()
+        await notify_supervisors({
+            "call_id": call_id,
+            "state": call.state
+        })
 
     print(f"AI permanently failed for {call_id}")
 
+async def notify_supervisors(message: dict):
+    for ws in active_connections:
+        await ws.send_json(message)
