@@ -5,6 +5,7 @@ The service ingests streaming call metadata, manages call lifecycle state, orche
 
 The focus of this project is **backend correctness, async design, and reliability**, not real AI or frontend UI.
 
+
 ---
 
 ## ✅ Implemented Requirements
@@ -76,6 +77,7 @@ State is the single source of truth for orchestration and idempotency.
 - Demonstrates event-driven, real-time backend design
 - Optional, non-blocking, no polling
 
+
 ---
 
 ## 🧠 Design Decisions (Intentional)
@@ -85,6 +87,7 @@ State is the single source of truth for orchestration and idempotency.
 - **No Docker required** — local PostgreSQL is sufficient
 - **No auth / frontend** — not part of task
 - **Async everywhere** — DB, API, background workflows
+
 
 ---
 
@@ -97,6 +100,7 @@ State is the single source of truth for orchestration and idempotency.
 - asyncpg
 - pytest + httpx
 - Python asyncio
+
 
 ---
 
@@ -132,6 +136,7 @@ articence_backend/
 
 ```
 
+
 ---
 
 ## ⚙️ Setup & Run
@@ -142,15 +147,18 @@ pip install -r requirements.txt
 ```
 
 ### 2. Configure environment
-Create .env:
+Create .env:   
 `DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/articence_db`
 
 ### 3. Run the service
-`python run.py`
+```bash 
+python run.py
+```
 - Server:
   `http://127.0.0.1:8000`
 - Swagger:
   `http://127.0.0.1:8000/docs`
+
 
 ---
 
@@ -171,12 +179,13 @@ Returns:
 `202 Accepted`
 
 ### Complete call
-`POST /v1/call/complete/{call_id}`
+`POST /v1/call/complete/{call_id}`  
 Triggers AI orchestration (once, idempotent).
 
 ### WebSocket
-`ws://127.0.0.1:8000/ws/supervisor`
+`ws://127.0.0.1:8000/ws/supervisor`  
 Recieves live call state updates.
+
 
 ---
 
@@ -185,6 +194,8 @@ Recieves live call state updates.
 pip install -r dev-requirements.txt
 pytest
 ```
+
+
 ---
 
 ## 📌 What This Project Demonstrates
@@ -196,8 +207,9 @@ pytest
 - Clean separation of concerns
 - Production-style decision making
 
+
 ---
 
 ## 👤 Author
-Chandan Agarwal
-Backend Engineering Candidate
+Chandan Agarwal  
+FastAPI Backend Intern Candidate
