@@ -3,7 +3,7 @@
 This repository contains an asynchronous FastAPI microservice built as part of a backend evaluation task.  
 The service ingests streaming call metadata, manages call lifecycle state, orchestrates flaky AI processing with retries, and safely handles concurrency and race conditions.
 
-The focus of this project is **backend correctness, async design, and reliability**, not real AI or frontend UI.
+The focus of this project is **backend correctness, async design, and reliability**.
 
 
 ---
@@ -70,7 +70,7 @@ State is the single source of truth for orchestration and idempotency.
 
 ---
 
-### 8. (Optional) WebSocket Supervisor Updates
+### 8. WebSocket Supervisor Updates
 - WebSocket endpoint for supervisors:
    `/ws/supervisor`
 - Emits updates on **call state transitions only**
@@ -80,24 +80,13 @@ State is the single source of truth for orchestration and idempotency.
 
 ---
 
-## 🧠 Design Decisions (Intentional)
-
-- **No Celery / Redis** — out of scope for evaluation
-- **No real AI** — focus is orchestration, not ML
-- **No Docker required** — local PostgreSQL is sufficient
-- **No auth / frontend** — not part of task
-- **Async everywhere** — DB, API, background workflows
-
-
----
-
 ## 🛠 Tech Stack
 
 - FastAPI
 - Uvicorn (WebSocket enabled)
 - PostgreSQL
-- SQLAlchemy (Async)
-- asyncpg
+- SQLAlchemy 
+- asyncpg (for async postgre)
 - pytest + httpx
 - Python asyncio
 
@@ -204,8 +193,6 @@ pytest
 - Fault tolerance
 - Retry strategies
 - Race-condition handling
-- Clean separation of concerns
-- Production-style decision making
 
 
 ---
