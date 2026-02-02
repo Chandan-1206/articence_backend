@@ -1,245 +1,203 @@
-# FastAPI Microservice — Voice AI Orchestration (Evaluation Task)
+# FastAPI Backend Intern Evaluation — Call Processing Service
 
-This project implements a high-performance, asynchronous microservice for ingesting real-time call metadata, orchestrating AI transcription and sentiment analysis, and reliably handling flaky external AI dependencies.
+This repository contains an asynchronous FastAPI microservice built as part of a backend evaluation task.  
+The service ingests streaming call metadata, manages call lifecycle state, orchestrates flaky AI processing with retries, and safely handles concurrency and race conditions.
 
-The system is designed to handle **high concurrency**, **non-blocking ingestion**, **fault tolerance**, and **race conditions**, following production-grade backend engineering principles.
-
----
-
-## 🚀 Key Features
-
-* **Async Non-Blocking Ingestion**
-
-  * Handles thousands of concurrent requests.
-  * Guarantees API response < 50ms.
-  * Validates packet sequence ordering.
-
-* **State Machine Based Call Processing**
-
-  * Deterministic transitions:
-
-    * `IN_PROGRESS → COMPLETED → PROCESSING_AI → ARCHIVED`
-    * Failure handling with retry → `FAILED`
-
-* **Fault-Tolerant AI Orchestration**
-
-  * Simulates flaky external AI APIs.
-  * 25% failure rate.
-  * Exponential backoff retry strategy.
-
-* **Concurrency Safe**
-
-  * Database row-level locking to prevent race conditions.
-
-* **Real-Time Updates via WebSockets**
-
-  * Live supervisor dashboard feed.
-
-* **Full Integration Testing**
-
-  * Covers concurrency & race conditions.
+The focus of this project is **backend correctness, async design, and reliability**, not real AI or frontend UI.
 
 ---
 
-## 🏗️ System Architecture
+## ✅ Implemented Requirements
 
-```
-                   ┌──────────────┐
-Incoming Requests ─▶  FastAPI API  │
-                   └───────┬──────┘
-                           │
-                           ▼
-                  Async PostgreSQL
-                           │
-                           ▼
-                  Background Workers
-                           │
-                           ▼
-                 Flaky AI Simulation
-                           │
-                           ▼
-                    WebSocket Feed
-```
+### 1. Async, Non-Blocking Ingestion
+- `POST /v1/call/stream/{call_id}`
+- Accepts streaming metadata packets
+- Returns **202 Accepted** immediately
+- Detects out-of-order packets and logs warnings
+- Never blocks request handling
 
 ---
 
-## 🔁 Call Processing Flow
-
+### 2. Call State Machine (Persistent)
+Each call is stored in PostgreSQL and transitions through deterministic states:
+```bash
+IN_PROGRESS → COMPLETED → PROCESSING_AI → ARCHIVED
+↓
+FAILED
 ```
-IN_PROGRESS
-     ↓
-COMPLETED
-     ↓
-PROCESSING_AI
-     ↓
-ARCHIVED
+State is the single source of truth for orchestration and idempotency.
 
-Failure → Retry → FAILED (after max attempts)
-```
+---
+
+### 3. PostgreSQL + Async SQLAlchemy
+- Async engine (`asyncpg`)
+- Persistent call and packet storage
+- Safe concurrent writes
+- No in-memory state assumptions
+
+---
+
+### 4. Flaky AI Simulation
+- Simulates an unreliable external AI dependency
+- Random latency (1–3 seconds)
+- Configurable failure rate (default 25%)
+- No real AI APIs used
+
+---
+
+### 5. Retry with Exponential Backoff
+- Automatic retries on AI failure
+- Backoff strategy: `1s → 2s → 4s`
+- Max retry attempts enforced
+- Final failure transitions call to `FAILED`
+
+---
+
+### 6. Concurrency & Race Condition Safety
+- Concurrent packet ingestion supported
+- Safe call creation under concurrent requests
+- Primary-key conflicts handled explicitly
+- Idempotent completion logic prevents duplicate background jobs
+
+---
+
+### 7. Integration Testing
+- Async integration test using `pytest` + `httpx`
+- Simulates concurrent packet ingestion
+- Verifies race-condition safety
+- Uses real database behavior (not mocks)
+
+---
+
+### 8. (Optional) WebSocket Supervisor Updates
+- WebSocket endpoint for supervisors:
+   `/ws/supervisor`
+- Emits updates on **call state transitions only**
+- Demonstrates event-driven, real-time backend design
+- Optional, non-blocking, no polling
+
+---
+
+## 🧠 Design Decisions (Intentional)
+
+- **No Celery / Redis** — out of scope for evaluation
+- **No real AI** — focus is orchestration, not ML
+- **No Docker required** — local PostgreSQL is sufficient
+- **No auth / frontend** — not part of task
+- **Async everywhere** — DB, API, background workflows
 
 ---
 
 ## 🛠 Tech Stack
 
-* **Backend:** FastAPI (Async)
-* **Database:** PostgreSQL
-* **ORM:** SQLAlchemy Async
-* **Concurrency:** asyncio
-* **Retries:** tenacity
-* **Testing:** pytest, httpx.AsyncClient
-* **WebSockets:** FastAPI WebSocket
+- FastAPI
+- Uvicorn (WebSocket enabled)
+- PostgreSQL
+- SQLAlchemy (Async)
+- asyncpg
+- pytest + httpx
+- Python asyncio
 
 ---
 
 ## 📦 Project Structure
+```bash
 
-```
-app/
- ├── main.py          # Application entrypoint
- ├── db.py            # Async DB setup
- ├── models.py        # Database models
- ├── schemas.py       # Pydantic schemas
- ├── workers.py       # Background AI orchestration
- ├── ai_mock.py       # Flaky AI simulation
- └── websocket.py     # Real-time dashboard updates
+articence_backend/
+├── app/
+│   ├── __init__.py
+│   ├── routes/
+│   │   ├── __init__.py
+│   │   ├── calls.py
+│   │   └── ws.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   └── flaky_ai.py
+│   ├── create_tables.py
+│   ├── database.py
+│   ├── main.py
+│   ├── models.py
+│   └── schemas.py
+│
+├── tests/
+│   ├── __init__.py
+│   ├── test_dbconn.py
+│   └── test_race_condition.py
+│
+├── .env.example
+├── .gitignore
+├── requirements.txt
+├── dev-requirements.txt
+└── run.py
 
-tests/
- └── test_race.py     # Integration tests
-
-README.md
-docker-compose.yml
 ```
 
 ---
 
-## ⚙️ Setup Instructions
+## ⚙️ Setup & Run
 
-### 1. Clone Repository
-
-```bash
-git clone https://github.com/<your-username>/fastapi-voice-ai-microservice.git
-cd fastapi-voice-ai-microservice
-```
-
-### 2. Setup Virtual Environment
-
-```bash
-python -m venv venv
-source venv/bin/activate   # Linux / Mac
-venv\Scripts\activate      # Windows
-```
-
-### 3. Install Dependencies
-
+### 1. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Start PostgreSQL (Docker Recommended)
+### 2. Configure environment
+Create .env:
+`DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/articence_db`
 
-```bash
-docker compose up -d
-```
-
-### 5. Run Application
-
-```bash
-uvicorn app.main:app --reload
-```
-
-API available at:
-
-```
-http://localhost:8000
-```
-
-Swagger UI:
-
-```
-http://localhost:8000/docs
-```
+### 3. Run the service
+`python run.py`
+- Server:
+  `http://127.0.0.1:8000`
+- Swagger:
+  `http://127.0.0.1:8000/docs`
 
 ---
 
-## 🔌 API Endpoints
+## 🔌 API Overview
 
-### Packet Ingestion
+### Stream packet
+`POST /v1/call/stream/{call_id}`
 
-```
-POST /v1/call/stream/{call_id}
-```
-
-Payload:
-
-```json
+json
+```bash
 {
   "sequence": 1,
-  "data": "base64_encoded_audio_chunk",
-  "timestamp": 1738173341.123
+  "data": "audio_chunk",
+  "timestamp": 1.23
 }
 ```
-
 Returns:
+`202 Accepted`
 
-```
-202 Accepted
-```
+### Complete call
+`POST /v1/call/complete/{call_id}`
+Triggers AI orchestration (once, idempotent).
 
----
-
-### WebSocket — Supervisor Dashboard
-
-```
-/ws/supervisor
-```
-
-Streams live call state updates.
+### WebSocket
+`ws://127.0.0.1:8000/ws/supervisor`
+Recieves live call state updates.
 
 ---
 
-## 🧪 Running Tests
-
+## 🧪 Run Tests
 ```bash
+pip install -r dev-requirements.txt
 pytest
 ```
+---
 
-Includes **integration tests simulating race conditions** and **concurrent packet arrival**.
+## 📌 What This Project Demonstrates
+- Async backend engineering
+- State-driven orchestration
+- Fault tolerance
+- Retry strategies
+- Race-condition handling
+- Clean separation of concerns
+- Production-style decision making
 
 ---
 
-## 🧠 Methodology
-
-### Design Principles
-
-* **Asynchronous everywhere** — zero blocking operations.
-* **Stateless API + Stateful DB** — reliable persistence.
-* **Retry-first design** — resilience to flaky AI APIs.
-* **Concurrency-safe writes** — row-level DB locking.
-
-### Race Condition Handling
-
-Simultaneous requests for the same `call_id` are synchronized using **database row locking (`SELECT FOR UPDATE`)**, ensuring correct packet ordering and consistency.
-
----
-
-## 📈 Performance Goals
-
-* API response time: **< 50ms**
-* Supports **thousands of concurrent streams**
-* Handles **bursty traffic without backpressure**
-
----
-
-## 📌 Future Improvements
-
-* Redis-based distributed task queue
-* Real AI transcription integration
-* Dashboard frontend UI
-* Horizontal scaling using Kubernetes
-
----
-
-## 👨‍💻 Author
-
-**Chandan Agarwal**
-Backend & Systems Engineer
+## 👤 Author
+Chandan Agarwal
+Backend Engineering Candidate
